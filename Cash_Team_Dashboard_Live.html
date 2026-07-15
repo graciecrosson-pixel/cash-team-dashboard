@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cash Team Performance Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --paper:#F6F4EE; --paper-raised:#FFFFFF; --ink:#1F2A37; --ink-soft:#5C6672;
+    --rule:#DCD7C9; --teal:#0F6E68; --teal-soft:#E3EFED; --gold:#B8873A; --gold-soft:#F5EBD9;
+    --navy:#2B3D63; --plum:#6B4B7A; --rust:#A5573B;
+    --shadow: 0 1px 2px rgba(31,42,55,0.06), 0 1px 1px rgba(31,42,55,0.04);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1080px; margin:0 auto; padding:24px 24px 64px;}
+
+  /* connect bar */
+  .connect-bar{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:14px 18px; margin-bottom:22px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; box-shadow:var(--shadow);}
+  .connect-bar input{flex:1; min-width:220px; padding:9px 12px; border:1px solid var(--rule); border-radius:5px; font-family:'Roboto Mono',monospace; font-size:12.5px; background:var(--paper);}
+  .connect-bar button{padding:9px 16px; border:none; border-radius:5px; background:var(--teal); color:#fff; font-weight:600; font-size:13px; cursor:pointer; font-family:'Inter';}
+  .connect-bar button:hover{opacity:0.9;}
+  .connect-bar button.secondary{background:transparent; color:var(--teal); border:1px solid var(--teal);}
+  #status{font-size:12px; color:var(--ink-soft); width:100%; margin-top:2px;}
+  #status.err{color:var(--rust);}
+  #status.ok{color:var(--teal);}
+
+  header{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1.5px solid var(--ink); padding-bottom:18px; margin-bottom:28px; flex-wrap:wrap; gap:12px;}
+  .brand-eyebrow{font-family:'Roboto Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--teal); margin:0 0 6px;}
+  h1{font-family:'Fraunces',serif; font-weight:500; font-size:32px; margin:0; letter-spacing:-0.01em;}
+  .meta{text-align:right; font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .meta strong{color:var(--ink); font-weight:600;}
+
+  .kpi-row{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:36px;}
+  .kpi-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:18px 20px; box-shadow:var(--shadow);}
+  .kpi-label{font-size:12px; color:var(--ink-soft); margin:0 0 8px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;}
+  .kpi-value{font-family:'Fraunces',serif; font-size:30px; font-weight:500; margin:0;}
+  .kpi-sub{font-size:12px; color:var(--ink-soft); margin-top:4px;}
+
+  section{margin-bottom:36px;}
+  .section-head{display:flex; align-items:baseline; justify-content:space-between; border-bottom:1px solid var(--rule); padding-bottom:8px; margin-bottom:16px;}
+  .section-title{font-family:'Fraunces',serif; font-size:18px; font-weight:500; margin:0;}
+  .section-note{font-size:12px; color:var(--ink-soft); margin:0;}
+
+  .meter-card, .streak-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:6px 20px;}
+  .meter-row, .streak-row{display:flex; align-items:center; gap:16px; padding:14px 0; border-bottom:1px solid var(--rule);}
+  .meter-row:last-child, .streak-row:last-child{border-bottom:none;}
+  .meter-name, .streak-name{width:150px; flex-shrink:0; font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px;}
+  .dot-swatch{width:9px; height:9px; border-radius:50%; display:inline-block; flex-shrink:0;}
+  .meter-track{flex:1; height:10px; background:var(--teal-soft); border-radius:5px; overflow:hidden;}
+  .meter-fill{height:100%; border-radius:5px;}
+  .meter-figs{width:150px; text-align:right; font-family:'Roboto Mono',monospace; font-size:13px; flex-shrink:0;}
+
+  .streak-dots{display:flex; gap:8px; flex:1; flex-wrap:wrap;}
+  .streak-dot{width:15px; height:15px; border-radius:50%; flex-shrink:0;}
+  .dot-hit{background:var(--teal);}
+  .dot-building{background:var(--gold-soft); border:2px solid var(--gold);}
+  .dot-nodata{background:transparent; border:1.5px dashed var(--rule);}
+  .trend-badge{width:170px; text-align:right; font-size:12px; font-weight:600; flex-shrink:0;}
+  .trend-up{color:var(--teal);}
+  .trend-flat{color:var(--ink-soft);}
+  .legend-line{font-size:11.5px; color:var(--ink-soft); margin:0 0 14px;}
+  .legend-line .dot-inline{display:inline-block; width:9px; height:9px; border-radius:50%; margin:0 4px -1px 10px;}
+
+  .chart-grid{display:grid; grid-template-columns:1.2fr 1fr; gap:20px;}
+  .chart-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:18px 20px;}
+  .chart-card h3{font-size:13px; margin:0 0 12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.05em; font-weight:600;}
+  .chart-holder{position:relative; height:220px;}
+
+  table{width:100%; border-collapse:collapse; background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; overflow:hidden;}
+  th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); font-weight:600; padding:12px 16px; border-bottom:1.5px solid var(--ink);}
+  th.num, td.num{text-align:right; font-family:'Roboto Mono',monospace;}
+  td{padding:12px 16px; font-size:14px; border-bottom:1px solid var(--rule);}
+  tr:last-child td{border-bottom:none;}
+
+  .empty-state{background:var(--paper-raised); border:1px dashed var(--rule); border-radius:6px; padding:40px 24px; text-align:center; color:var(--ink-soft); font-size:14px;}
+  footer{margin-top:40px; padding-top:16px; border-top:1px solid var(--rule); font-size:11.5px; color:var(--ink-soft); text-align:center;}
+
+  @media (max-width:720px){
+    .kpi-row{grid-template-columns:1fr;}
+    .chart-grid{grid-template-columns:1fr;}
+    .meter-name, .streak-name{width:100px; font-size:12.5px;}
+    .trend-badge{width:120px; font-size:11px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="connect-bar" id="connectBar">
+    <input type="text" id="sheetInput" placeholder="Paste your Google Sheet URL or Sheet ID here" style="display:none;">
+    <button id="connectBtn" style="display:none;">Connect</button>
+    <button id="changeSheetBtn" class="secondary">Change sheet</button>
+    <button id="refreshBtn" class="secondary">Refresh</button>
+    <p id="status">Loading…</p>
+  </div>
+
+  <header>
+    <div>
+      <p class="brand-eyebrow">Cash Operations · Team Ledger</p>
+      <h1>Cash Team Performance</h1>
+    </div>
+    <div class="meta">
+      <span id="dateRangeLabel">Waiting for data</span><br>
+      Daily target: <strong id="targetLabel">288 pts / person</strong>
+    </div>
+  </header>
+
+  <div id="dashboardBody" style="display:none;">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <p class="kpi-label">Total points, this period</p>
+        <p class="kpi-value" id="kpiTotal">–</p>
+        <p class="kpi-sub" id="kpiTotalSub">across all team members</p>
+      </div>
+      <div class="kpi-card">
+        <p class="kpi-label">Team average vs. target</p>
+        <p class="kpi-value" id="kpiPct">–</p>
+        <p class="kpi-sub">measured across every logged day</p>
+      </div>
+      <div class="kpi-card">
+        <p class="kpi-label">Most active on latest day</p>
+        <p class="kpi-value" id="kpiTop">–</p>
+        <p class="kpi-sub" id="kpiTopSub"></p>
+      </div>
+    </div>
+
+    <section>
+      <div class="section-head">
+        <p class="section-title">Period-to-date progress toward target</p>
+        <p class="section-note" id="meterDateNote"></p>
+      </div>
+      <div class="meter-card" id="meterCard"></div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <p class="section-title">Consistency &amp; trend</p>
+        <p class="section-note" id="streakRangeNote"></p>
+      </div>
+      <p class="legend-line">
+        <span class="dot-inline" style="background:var(--teal);"></span>hit target
+        <span class="dot-inline dot-building"></span>building toward it
+        <span class="dot-inline" style="background:transparent;border:1.5px dashed var(--rule);"></span>no day logged
+        — every trend badge compares a person only to their own recent pace, never to anyone else.
+      </p>
+      <div class="streak-card" id="streakCard"></div>
+    </section>
+
+    <div class="chart-grid" style="margin-bottom:36px;">
+      <div class="chart-card">
+        <h3>Points by employee — latest day</h3>
+        <div class="chart-holder"><canvas id="barChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Daily point trend</h3>
+        <div class="chart-holder"><canvas id="lineChart"></canvas></div>
+      </div>
+    </div>
+
+    <section>
+      <div class="section-head">
+        <p class="section-title">Today's totals</p>
+        <p class="section-note" id="tableDateNote"></p>
+      </div>
+      <table>
+        <thead><tr><th>Employee</th><th class="num">Points</th><th class="num">% of target</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <div id="emptyState" class="empty-state">
+    Paste your Google Sheet's URL or ID above and click Connect to load live data from <code>Daily_Task_Log</code>.
+  </div>
+
+  <footer>Pulls live from your Google Sheet's published CSV export. Refresh anytime to pull the latest entries — nothing is cached.</footer>
+</div>
+
+<script>
+let TARGET = 288;
+const DEFAULT_SHEET_ID = '1G-veIFLvjtBhSELGF9uGjZG_yIWxNZX3Fu_6WfJUvcU';
+let barChartInstance = null;
+let lineChartInstance = null;
+const PALETTE = ['#2B3D63','#0F6E68','#B8873A','#6B4B7A','#A5573B','#3E6B8A'];
+
+function extractSheetId(input){
+  input = input.trim();
+  const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if(m) return m[1];
+  return input; // assume they pasted the raw ID
+}
+
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i++; } else { inQuotes = false; }
+      } else field += c;
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === ','){ row.push(field); field = ''; }
+      else if(c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
+      else if(c === '\r'){ /* skip */ }
+      else field += c;
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(c => c !== ''));
+}
+
+async function fetchSheetTab(sheetId, tabName){
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error(`Could not read tab "${tabName}" (HTTP ${res.status}). Check sharing settings and tab name.`);
+  const text = await res.text();
+  if(text.trim().startsWith('<')) throw new Error(`Tab "${tabName}" isn't accessible. Make sure the Sheet is shared as "Anyone with the link — Viewer."`);
+  return parseCSV(text);
+}
+
+function toISODate(raw){
+  if(!raw) return null;
+  let d = new Date(raw);
+  if(isNaN(d)){
+    const parts = raw.split(/[\/\-]/);
+    if(parts.length === 3){
+      let [a,b,c] = parts;
+      if(c.length === 4) d = new Date(`${c}-${a.padStart(2,'0')}-${b.padStart(2,'0')}`);
+    }
+  }
+  if(isNaN(d)) return null;
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function setStatus(msg, kind){
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = kind || '';
+}
+
+async function loadDashboard(){
+  const raw = document.getElementById('sheetInput').value;
+  if(!raw.trim()){ setStatus('Paste a Sheet URL or ID first.', 'err'); return; }
+  const sheetId = extractSheetId(raw);
+  setStatus('Loading from Google Sheets…');
+
+  try{
+    const logRows = await fetchSheetTab(sheetId, 'Daily_Task_Log');
+    const header = logRows[0].map(h => h.trim().toLowerCase());
+    const dateIdx = header.findIndex(h => h.includes('date'));
+    const empIdx = header.findIndex(h => h.includes('employee'));
+    const ptsIdx = header.findIndex(h => h.includes('points'));
+    if(dateIdx === -1 || empIdx === -1 || ptsIdx === -1) throw new Error('Could not find Date, Employee_Name, or Points columns in Daily_Task_Log.');
+
+    const series = {};
+    const dateSet = new Set();
+    for(let i=1;i<logRows.length;i++){
+      const r = logRows[i];
+      const iso = toISODate(r[dateIdx]);
+      const emp = (r[empIdx]||'').trim();
+      const pts = parseFloat(r[ptsIdx]);
+      if(!iso || !emp || isNaN(pts)) continue;
+      dateSet.add(iso);
+      if(!series[emp]) series[emp] = {};
+      series[emp][iso] = (series[emp][iso] || 0) + pts;
+    }
+
+    // try to read the target from Task_Points_Config
+    try{
+      const cfgRows = await fetchSheetTab(sheetId, 'Task_Points_Config');
+      outer:
+      for(const row of cfgRows){
+        for(let c=0;c<row.length;c++){
+          if(/daily point target/i.test(row[c])){
+            for(let n=c+1;n<row.length;n++){
+              const v = parseFloat(row[n]);
+              if(!isNaN(v)){ TARGET = v; break outer; }
+            }
+          }
+        }
+      }
+    }catch(e){ /* fall back to default TARGET, non-fatal */ }
+
+    renderDashboard(series, [...dateSet].sort());
+    setStatus(`Connected — last refreshed ${new Date().toLocaleTimeString()}`, 'ok');
+    document.getElementById('dashboardBody').style.display = 'block';
+    document.getElementById('emptyState').style.display = 'none';
+  }catch(err){
+    setStatus(err.message, 'err');
+  }
+}
+
+function renderDashboard(series, allDates){
+  const employees = Object.keys(series).sort();
+  const colors = {};
+  employees.forEach((e,i) => colors[e] = PALETTE[i % PALETTE.length]);
+
+  const last5 = allDates.slice(-5);
+  const latestDate = allDates[allDates.length-1];
+  const dateLabels = last5.map(d => {
+    const [y,m,dd] = d.split('-');
+    return new Date(y,m-1,dd).toLocaleDateString('en-US',{month:'short', day:'numeric'});
+  });
+
+  document.getElementById('dateRangeLabel').textContent =
+    `${new Date(allDates[0]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} – ${new Date(latestDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+  document.getElementById('targetLabel').textContent = `${TARGET} pts / person`;
+  document.getElementById('meterDateNote').textContent = `${new Date(allDates[0]).toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${new Date(latestDate).toLocaleDateString('en-US',{month:'short',day:'numeric'})} · target ${TARGET} pts/day`;
+  document.getElementById('streakRangeNote').textContent = `last ${last5.length} logged day${last5.length>1?'s':''}`;
+  document.getElementById('tableDateNote').textContent = new Date(latestDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+  const todayPoints = {};
+  employees.forEach(e => todayPoints[e] = series[e][latestDate] || 0);
+
+  const totalPoints = employees.reduce((sum,e) => sum + Object.values(series[e]).reduce((a,b)=>a+b,0), 0);
+  const loggedDays = employees.reduce((sum,e) => sum + Object.keys(series[e]).length, 0);
+  const avgPct = Math.round((totalPoints/(TARGET*loggedDays))*100);
+  const topEmp = employees.reduce((a,b) => todayPoints[a] > todayPoints[b] ? a : b);
+
+  document.getElementById('kpiTotal').textContent = Math.round(totalPoints).toLocaleString() + ' pts';
+  document.getElementById('kpiTotalSub').textContent = `across ${employees.length} team member${employees.length>1?'s':''}`;
+  document.getElementById('kpiPct').textContent = avgPct + '%';
+  document.getElementById('kpiTop').textContent = topEmp;
+  document.getElementById('kpiTopSub').textContent = `${todayPoints[topEmp]} pts on ${dateLabels[dateLabels.length-1]}`;
+
+  // meters
+  const meterCard = document.getElementById('meterCard');
+  meterCard.innerHTML = '';
+  const periodStats = {};
+  employees.forEach(e=>{
+    const daysLogged = Object.keys(series[e]).length;
+    const totalPts = Object.values(series[e]).reduce((a,b)=>a+b,0);
+    periodStats[e] = { pct: Math.round((totalPts/(TARGET*daysLogged))*100), avgPts: Math.round(totalPts/daysLogged), daysLogged };
+  });
+  [...employees].sort((a,b)=>periodStats[b].pct-periodStats[a].pct).forEach(e=>{
+    const { pct, avgPts, daysLogged } = periodStats[e];
+    const fillColor = pct >= 100 ? '#0F6E68' : '#C9A24B';
+    const row = document.createElement('div');
+    row.className = 'meter-row';
+    row.innerHTML = `
+      <div class="meter-name"><span class="dot-swatch" style="background:${colors[e]}"></span>${e}</div>
+      <div class="meter-track"><div class="meter-fill" style="width:${Math.min(pct,100)}%; background:${fillColor};"></div></div>
+      <div class="meter-figs">${avgPts} avg/day &nbsp;·&nbsp; ${pct}%</div>`;
+    meterCard.appendChild(row);
+  });
+
+  // streak + trend
+  const streakCard = document.getElementById('streakCard');
+  streakCard.innerHTML = '';
+  employees.forEach(e=>{
+    const vals = last5.map(d => series[e][d] !== undefined ? series[e][d] : null);
+    const dotsHtml = vals.map(v=>{
+      if(v===null) return `<span class="streak-dot dot-nodata"></span>`;
+      return v >= TARGET ? `<span class="streak-dot dot-hit"></span>` : `<span class="streak-dot dot-building"></span>`;
+    }).join('');
+
+    const priorLogged = vals.slice(0,-1).filter(v=>v!==null);
+    const priorAvg = priorLogged.length ? priorLogged.reduce((a,b)=>a+b,0)/priorLogged.length : null;
+    const todayVal = vals[vals.length-1];
+    let trendHtml;
+    if(priorAvg===null || todayVal===null){
+      trendHtml = `<span class="trend-flat">not enough history yet</span>`;
+    } else {
+      const diffPct = Math.round((todayVal-priorAvg)/priorAvg*100);
+      const cls = diffPct >= 0 ? 'trend-up' : 'trend-flat';
+      const word = diffPct >= 0 ? 'above' : 'below';
+      trendHtml = `<span class="${cls}">${Math.abs(diffPct)}% ${word} own avg</span>`;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'streak-row';
+    row.innerHTML = `<div class="streak-name">${e}</div><div class="streak-dots">${dotsHtml}</div><div class="trend-badge">${trendHtml}</div>`;
+    streakCard.appendChild(row);
+  });
+
+  // bar chart
+  if(barChartInstance) barChartInstance.destroy();
+  barChartInstance = new Chart(document.getElementById('barChart'), {
+    type:'bar',
+    data:{ labels: employees, datasets:[{ data: employees.map(e=>todayPoints[e]), backgroundColor: employees.map(e=>colors[e]), borderRadius:4, maxBarThickness:44 }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ y:{ beginAtZero:true, grid:{color:'#E5E1D4'} }, x:{ grid:{display:false} } } }
+  });
+
+  // line chart
+  if(lineChartInstance) lineChartInstance.destroy();
+  lineChartInstance = new Chart(document.getElementById('lineChart'), {
+    type:'line',
+    data:{ labels: dateLabels, datasets: employees.map(e=>({ label:e, data: last5.map(d=>series[e][d] !== undefined ? series[e][d] : null), borderColor: colors[e], backgroundColor:'transparent', borderWidth:2.5, pointRadius:3, tension:0.3, spanGaps:true })) },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:true, position:'bottom', labels:{ boxWidth:8, boxHeight:8, font:{size:10.5}, usePointStyle:true } } },
+      scales:{ y:{ beginAtZero:true, grid:{color:'#E5E1D4'} }, x:{ grid:{display:false} } } }
+  });
+
+  // table
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  [...employees].sort((a,b)=>todayPoints[b]-todayPoints[a]).forEach(e=>{
+    const pts = todayPoints[e];
+    const pct = Math.round(pts/TARGET*100);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${e}</td><td class="num">${pts}</td><td class="num">${pct}%</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('connectBtn').addEventListener('click', loadDashboard);
+document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+document.getElementById('sheetInput').addEventListener('keydown', e => { if(e.key==='Enter') loadDashboard(); });
+document.getElementById('changeSheetBtn').addEventListener('click', () => {
+  document.getElementById('sheetInput').style.display = 'block';
+  document.getElementById('connectBtn').style.display = 'inline-block';
+  document.getElementById('sheetInput').focus();
+});
+
+// auto-connect on open using the built-in sheet
+if(DEFAULT_SHEET_ID){
+  document.getElementById('sheetInput').value = DEFAULT_SHEET_ID;
+  loadDashboard();
+}
+</script>
+</body>
+</html>
