@@ -383,6 +383,7 @@ async function loadDashboard(){
     const series = {};
     const dateSet = new Set();
     const taskMixByEmployee = {};
+    const otherTypesByEmployee = {};
     const perEmpDateTask = {};
     const parsedRows = [];
     let maxIso = null;
@@ -413,6 +414,10 @@ async function loadDashboard(){
       const bucket = bucketType(row.type);
       if(!taskMixByEmployee[row.emp]) taskMixByEmployee[row.emp] = {};
       taskMixByEmployee[row.emp][bucket] = (taskMixByEmployee[row.emp][bucket] || 0) + row.pts;
+      if(bucket === 'Other' && row.type){
+        if(!otherTypesByEmployee[row.emp]) otherTypesByEmployee[row.emp] = new Set();
+        otherTypesByEmployee[row.emp].add(row.type);
+      }
 
       if(row.taskName){
         if(!perEmpDateTask[row.emp]) perEmpDateTask[row.emp] = {};
@@ -439,7 +444,7 @@ async function loadDashboard(){
       }
     }catch(e){ /* fall back to default TARGET, non-fatal */ }
 
-    renderDashboard(series, [...dateSet].sort(), taskMixByEmployee, perEmpDateTask);
+    renderDashboard(series, [...dateSet].sort(), taskMixByEmployee, perEmpDateTask, otherTypesByEmployee);
     setStatus(`Connected — last refreshed ${new Date().toLocaleTimeString()}`, 'ok');
     document.getElementById('dashboardBody').style.display = 'block';
     document.getElementById('emptyState').style.display = 'none';
@@ -448,7 +453,7 @@ async function loadDashboard(){
   }
 }
 
-function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask){
+function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, otherTypesByEmployee){
   const employees = Object.keys(series).sort();
   const colors = {};
   employees.forEach((e,i) => colors[e] = PALETTE[i % PALETTE.length]);
@@ -569,7 +574,13 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask){
     row.className = 'mix-row';
     const segs = bucketOrder.map(b => {
       const pct = Math.round((mix[b]||0)/total*100);
-      return pct > 0 ? `<div style="width:${pct}%; background:${BUCKET_COLORS[b]};" title="${b} ${pct}%"></div>` : '';
+      if(pct <= 0) return '';
+      const pts = Math.round(mix[b]||0);
+      let tooltip = `${b}: ${pts} pts (${pct}%)`;
+      if(b === 'Other' && otherTypesByEmployee[e] && otherTypesByEmployee[e].size){
+        tooltip += ` — includes ${[...otherTypesByEmployee[e]].sort().join(', ')}`;
+      }
+      return `<div style="width:${pct}%; background:${BUCKET_COLORS[b]};" title="${tooltip}"></div>`;
     }).join('');
     row.innerHTML = `<p class="mix-name">${e}</p><div class="mix-bar">${segs}</div>`;
     mixCard.appendChild(row);
