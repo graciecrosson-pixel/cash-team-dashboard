@@ -6,6 +6,7 @@
 <title>Cash Team Productivity Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.47.0/iconfont/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   :root{
@@ -70,6 +71,39 @@
   .legend-line{font-family:'Times New Roman',serif; font-style:italic; font-size:13px; color:var(--ink-soft); margin:0 0 14px;}
   .legend-line .dot-inline{display:inline-block; width:9px; height:9px; border-radius:50%; margin:0 4px -1px 10px;}
 
+  .milestone-banner{background:var(--green); border-radius:6px; padding:16px 20px; margin:20px 0 32px; display:flex; align-items:center; gap:12px;}
+  .milestone-banner i{font-size:22px; color:#04342C;}
+  .milestone-title{margin:0; font-family:'Inter Tight',sans-serif; font-weight:800; font-size:15px; color:#04342C;}
+  .milestone-sub{margin:0; font-size:13px; color:#04342C;}
+
+  .best-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:6px 20px;}
+  .best-row{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid var(--rule);}
+  .best-row:last-child{border-bottom:none;}
+  .best-name{font-weight:700; font-size:14px; display:flex; align-items:center; gap:8px;}
+  .best-figs{font-size:13px; font-family:'Inter',sans-serif;}
+  .best-figs strong{font-family:'Inter Tight',sans-serif; font-weight:800; font-size:15px;}
+
+  .mix-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:16px 20px;}
+  .mix-row{margin-bottom:14px;}
+  .mix-row:last-child{margin-bottom:0;}
+  .mix-name{font-size:13px; font-weight:700; margin:0 0 6px;}
+  .mix-bar{display:flex; height:10px; border-radius:5px; overflow:hidden;}
+  .mix-legend{display:flex; flex-wrap:wrap; gap:14px; margin-top:14px; font-size:11.5px; color:var(--ink-soft);}
+  .mix-legend .sw{display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:5px;}
+
+  .task-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .task-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:14px 16px;}
+  .task-card-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+  .task-who{display:flex; align-items:center; gap:8px;}
+  .task-avatar{width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10.5px; font-weight:700; font-family:'Inter Tight',sans-serif; flex-shrink:0;}
+  .task-name-lbl{font-size:13.5px; font-weight:700;}
+  .task-pts-pill{font-family:'Inter Tight',sans-serif; font-weight:800; font-size:13px; padding:3px 9px; border-radius:100px;}
+  .task-item{display:flex; align-items:center; gap:8px; background:var(--paper); border-radius:5px; padding:6px 10px; margin-bottom:6px;}
+  .task-item:last-child{margin-bottom:0;}
+  .task-item i{font-size:15px; color:var(--ink-soft); flex-shrink:0;}
+  .task-item span.lbl{font-size:12.5px; flex:1;}
+  .task-item span.qty{font-size:12px; color:var(--ink-soft);}
+
   .chart-grid{display:grid; grid-template-columns:1.2fr 1fr; gap:20px;}
   .chart-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:18px 20px;}
   .chart-card h3{font-size:13px; margin:0 0 12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.05em; font-weight:600;}
@@ -115,6 +149,14 @@
     </div>
   </header>
 
+  <div class="milestone-banner" id="milestoneBanner" style="display:none;">
+    <i class="ti ti-trophy" aria-hidden="true"></i>
+    <div>
+      <p class="milestone-title">Team milestone</p>
+      <p class="milestone-sub" id="milestoneText"></p>
+    </div>
+  </div>
+
   <div id="dashboardBody" style="display:none;">
     <div class="kpi-row">
       <div class="kpi-card">
@@ -144,11 +186,36 @@
 
     <section>
       <div class="section-head">
+        <p class="section-title">Personal bests</p>
+        <p class="section-note">best single day, this period</p>
+      </div>
+      <div class="best-card" id="bestCard"></div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <p class="section-title">Task mix by person</p>
+        <p class="section-note">share of points by task type, this period</p>
+      </div>
+      <div class="mix-card" id="mixCard"></div>
+      <div class="mix-legend" id="mixLegend"></div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <p class="section-title">Top tasks, latest day</p>
+        <p class="section-note" id="tasksDateNote"></p>
+      </div>
+      <div class="task-grid" id="taskGrid"></div>
+    </section>
+
+    <section>
+      <div class="section-head">
         <p class="section-title">Consistency &amp; trend</p>
         <p class="section-note" id="streakRangeNote"></p>
       </div>
       <p class="legend-line">
-        <span class="dot-inline" style="background:var(--teal);"></span>hit target
+        <span class="dot-inline" style="background:var(--green);"></span>hit target
         <span class="dot-inline dot-building"></span>building toward it
         <span class="dot-inline" style="background:transparent;border:1.5px dashed var(--rule);"></span>no day logged
         — every trend badge compares a person only to their own recent pace, never to anyone else.
@@ -250,6 +317,32 @@ function formatDateLabel(iso, opts){
   return new Date(y, m-1, d).toLocaleDateString('en-US', opts || {month:'short', day:'numeric', year:'numeric'});
 }
 
+function bucketType(rawType){
+  const t = (rawType||'').toLowerCase();
+  if(t.includes('check')) return 'Check';
+  if(t.includes('internal transfer')) return 'Internal transfer';
+  if(t.includes('treasury')) return 'Treasury';
+  return 'Other';
+}
+const BUCKET_COLORS = { 'Check':'#000000', 'Internal transfer':'#01BC48', 'Treasury':'#5667FF', 'Other':'#FF6624' };
+
+function taskIcon(name){
+  const n = (name||'').toLowerCase();
+  if(n.includes('check')) return 'ti-building-bank';
+  if(n.includes('wire')) return 'ti-arrows-left-right';
+  if(n.includes('internal transfer')) return 'ti-transfer';
+  if(n.includes('ach')) return 'ti-repeat';
+  if(n.includes('mail')) return 'ti-mail';
+  if(n.includes('fee')) return 'ti-receipt';
+  if(n.includes('treasury')) return 'ti-building-castle';
+  if(n.includes('credit')) return 'ti-cash-banknote';
+  if(n.includes('approval') || n.includes('move money')) return 'ti-shield-check';
+  if(n.includes('bank link')) return 'ti-link';
+  if(n.includes('qcd')) return 'ti-file-certificate';
+  if(n.includes('write off')) return 'ti-eraser';
+  return 'ti-file-text';
+}
+
 function setStatus(msg, kind){
   const el = document.getElementById('status');
   el.textContent = msg;
@@ -268,10 +361,15 @@ async function loadDashboard(){
     const dateIdx = header.findIndex(h => h.includes('date'));
     const empIdx = header.findIndex(h => h.includes('employee'));
     const ptsIdx = header.findIndex(h => h.includes('points'));
+    const taskIdx = header.findIndex(h => h.includes('task'));
+    const qtyIdx = header.findIndex(h => h.includes('quantity'));
+    const typeIdx = header.findIndex(h => h.includes('type'));
     if(dateIdx === -1 || empIdx === -1 || ptsIdx === -1) throw new Error('Could not find Date, Employee_Name, or Points columns in Daily_Task_Log.');
 
     const series = {};
     const dateSet = new Set();
+    const taskMixByEmployee = {};
+    const perEmpDateTask = {};
     for(let i=1;i<logRows.length;i++){
       const r = logRows[i];
       const iso = toISODate(r[dateIdx]);
@@ -281,6 +379,23 @@ async function loadDashboard(){
       dateSet.add(iso);
       if(!series[emp]) series[emp] = {};
       series[emp][iso] = (series[emp][iso] || 0) + pts;
+
+      const type = typeIdx !== -1 ? (r[typeIdx]||'').trim() : '';
+      const bucket = bucketType(type);
+      if(!taskMixByEmployee[emp]) taskMixByEmployee[emp] = {};
+      taskMixByEmployee[emp][bucket] = (taskMixByEmployee[emp][bucket] || 0) + pts;
+
+      if(taskIdx !== -1){
+        const taskName = (r[taskIdx]||'').trim();
+        const qty = qtyIdx !== -1 ? (parseFloat(r[qtyIdx]) || 0) : 0;
+        if(taskName){
+          if(!perEmpDateTask[emp]) perEmpDateTask[emp] = {};
+          if(!perEmpDateTask[emp][iso]) perEmpDateTask[emp][iso] = {};
+          if(!perEmpDateTask[emp][iso][taskName]) perEmpDateTask[emp][iso][taskName] = { qty:0, pts:0 };
+          perEmpDateTask[emp][iso][taskName].qty += qty;
+          perEmpDateTask[emp][iso][taskName].pts += pts;
+        }
+      }
     }
 
     // try to read the target from Task_Points_Config
@@ -299,7 +414,7 @@ async function loadDashboard(){
       }
     }catch(e){ /* fall back to default TARGET, non-fatal */ }
 
-    renderDashboard(series, [...dateSet].sort());
+    renderDashboard(series, [...dateSet].sort(), taskMixByEmployee, perEmpDateTask);
     setStatus(`Connected — last refreshed ${new Date().toLocaleTimeString()}`, 'ok');
     document.getElementById('dashboardBody').style.display = 'block';
     document.getElementById('emptyState').style.display = 'none';
@@ -308,7 +423,7 @@ async function loadDashboard(){
   }
 }
 
-function renderDashboard(series, allDates){
+function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask){
   const employees = Object.keys(series).sort();
   const colors = {};
   employees.forEach((e,i) => colors[e] = PALETTE[i % PALETTE.length]);
@@ -341,6 +456,9 @@ function renderDashboard(series, allDates){
   document.getElementById('kpiTop').textContent = topEmp;
   document.getElementById('kpiTopSub').textContent = `${todayPoints[topEmp]} pts on ${dateLabels[dateLabels.length-1]}`;
 
+  document.getElementById('milestoneBanner').style.display = 'flex';
+  document.getElementById('milestoneText').textContent = `The team has logged ${Math.round(totalPoints).toLocaleString()} points together this period`;
+
   // meters
   const meterCard = document.getElementById('meterCard');
   meterCard.innerHTML = '';
@@ -360,6 +478,75 @@ function renderDashboard(series, allDates){
       <div class="meter-track"><div class="meter-fill" style="width:${Math.min(pct,100)}%; background:${fillColor};"></div></div>
       <div class="meter-figs">${avgPts} avg/day &nbsp;·&nbsp; ${pct}%</div>`;
     meterCard.appendChild(row);
+  });
+
+  // personal bests
+  const bestCard = document.getElementById('bestCard');
+  bestCard.innerHTML = '';
+  [...employees].sort((a,b)=>{
+    const bestA = Math.max(...Object.values(series[a]));
+    const bestB = Math.max(...Object.values(series[b]));
+    return bestB - bestA;
+  }).forEach(e=>{
+    const entries = Object.entries(series[e]);
+    const [bestDate, bestPts] = entries.reduce((best, cur) => cur[1] > best[1] ? cur : best, entries[0]);
+    const row = document.createElement('div');
+    row.className = 'best-row';
+    row.innerHTML = `
+      <div class="best-name"><span class="dot-swatch" style="background:${colors[e]}"></span>${e}</div>
+      <div class="best-figs"><strong>${Math.round(bestPts)} pts</strong> &nbsp;·&nbsp; ${formatDateLabel(bestDate,{month:'short',day:'numeric'})}</div>`;
+    bestCard.appendChild(row);
+  });
+
+  // task mix by person
+  const mixCard = document.getElementById('mixCard');
+  mixCard.innerHTML = '';
+  const bucketOrder = ['Check','Internal transfer','Treasury','Other'];
+  employees.forEach(e=>{
+    const mix = taskMixByEmployee[e] || {};
+    const total = bucketOrder.reduce((sum,b) => sum + (mix[b]||0), 0) || 1;
+    const row = document.createElement('div');
+    row.className = 'mix-row';
+    const segs = bucketOrder.map(b => {
+      const pct = Math.round((mix[b]||0)/total*100);
+      return pct > 0 ? `<div style="width:${pct}%; background:${BUCKET_COLORS[b]};" title="${b} ${pct}%"></div>` : '';
+    }).join('');
+    row.innerHTML = `<p class="mix-name">${e}</p><div class="mix-bar">${segs}</div>`;
+    mixCard.appendChild(row);
+  });
+  document.getElementById('mixLegend').innerHTML = bucketOrder.map(b =>
+    `<span><span class="sw" style="background:${BUCKET_COLORS[b]};"></span>${b}</span>`
+  ).join('');
+
+  // top tasks, latest day
+  document.getElementById('tasksDateNote').textContent = formatDateLabel(latestDate,{month:'short',day:'numeric',year:'numeric'});
+  const taskGrid = document.getElementById('taskGrid');
+  taskGrid.innerHTML = '';
+  employees.forEach(e=>{
+    const dayTasks = (perEmpDateTask[e] && perEmpDateTask[e][latestDate]) || {};
+    const topTwo = Object.entries(dayTasks).sort((a,b)=>b[1].pts-a[1].pts).slice(0,2);
+    const pts = todayPoints[e];
+    const pct = Math.round(pts/TARGET*100);
+    const pillBg = pct >= 100 ? 'var(--green-tint)' : 'var(--orange-tint)';
+    const pillColor = pct >= 100 ? '#04342C' : '#993C1D';
+    const card = document.createElement('div');
+    card.className = 'task-card';
+    const itemsHtml = topTwo.length ? topTwo.map(([name,d]) => `
+      <div class="task-item">
+        <i class="ti ${taskIcon(name)}" aria-hidden="true"></i>
+        <span class="lbl">${name}</span>
+        <span class="qty">x${Math.round(d.qty)}</span>
+      </div>`).join('') : `<div class="task-item"><span class="lbl" style="color:var(--ink-soft);">No tasks logged this day</span></div>`;
+    card.innerHTML = `
+      <div class="task-card-head">
+        <div class="task-who">
+          <div class="task-avatar" style="background:${colors[e]}; color:${colors[e]==='#000000'||colors[e]==='#5667FF'?'#fff':'#04342C'};">${e.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+          <span class="task-name-lbl">${e}</span>
+        </div>
+        <span class="task-pts-pill" style="background:${pillBg}; color:${pillColor};">${Math.round(pts)} pts</span>
+      </div>
+      ${itemsHtml}`;
+    taskGrid.appendChild(card);
   });
 
   // streak + trend
