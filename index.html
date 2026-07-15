@@ -176,7 +176,7 @@
         <p class="section-note" id="tableDateNote"></p>
       </div>
       <table>
-        <thead><tr><th>Employee</th><th class="num">Points</th><th class="num">% of target</th><th class="num">Vs. own avg</th></tr></thead>
+        <thead><tr><th>Employee</th><th class="num">Points</th><th class="num">% of target</th></tr></thead>
         <tbody id="tableBody"></tbody>
       </table>
     </section>
@@ -662,7 +662,7 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, ot
     const pts = todayPoints[e];
     const pct = Math.round(pts/TARGET*100);
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${e}</td><td class="num">${pts}</td><td class="num">${pct}%</td><td class="num">${trendByEmployee[e].html}</td>`;
+    tr.innerHTML = `<td><strong>${e}</strong></td><td class="num">${pts}</td><td class="num">${pct}%</td>`;
     tbody.appendChild(tr);
   });
 }
