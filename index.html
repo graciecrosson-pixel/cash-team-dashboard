@@ -5,14 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cash Team Performance Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   :root{
-    --paper:#F6F4EE; --paper-raised:#FFFFFF; --ink:#1F2A37; --ink-soft:#5C6672;
-    --rule:#DCD7C9; --teal:#0F6E68; --teal-soft:#E3EFED; --gold:#B8873A; --gold-soft:#F5EBD9;
-    --navy:#2B3D63; --plum:#6B4B7A; --rust:#A5573B;
-    --shadow: 0 1px 2px rgba(31,42,55,0.06), 0 1px 1px rgba(31,42,55,0.04);
+    --paper:#FFFFFF; --paper-raised:#FFFFFF; --ink:#000000; --ink-soft:rgba(0,0,0,0.58);
+    --rule:rgba(0,0,0,0.12);
+    --green:#01BC48; --green-tint:#C8F9DA;
+    --blue:#5667FF; --blue-tint:#E4E7FF;
+    --orange:#FF6624; --orange-tint:#FFE8DE;
+    --shadow: 0 1px 2px rgba(0,0,0,0.05), 0 1px 1px rgba(0,0,0,0.03);
   }
   *{box-sizing:border-box;}
   body{margin:0; background:var(--paper); color:var(--ink); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;}
@@ -20,49 +22,52 @@
 
   /* connect bar */
   .connect-bar{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:14px 18px; margin-bottom:22px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; box-shadow:var(--shadow);}
-  .connect-bar input{flex:1; min-width:220px; padding:9px 12px; border:1px solid var(--rule); border-radius:5px; font-family:'Roboto Mono',monospace; font-size:12.5px; background:var(--paper);}
-  .connect-bar button{padding:9px 16px; border:none; border-radius:5px; background:var(--teal); color:#fff; font-weight:600; font-size:13px; cursor:pointer; font-family:'Inter';}
-  .connect-bar button:hover{opacity:0.9;}
-  .connect-bar button.secondary{background:transparent; color:var(--teal); border:1px solid var(--teal);}
+  .connect-bar input{flex:1; min-width:220px; padding:9px 12px; border:1px solid var(--rule); border-radius:5px; font-family:'Inter',monospace; font-size:12.5px; background:var(--paper);}
+  .connect-bar button{padding:9px 16px; border:none; border-radius:5px; background:var(--green); color:#fff; font-weight:600; font-size:13px; cursor:pointer; font-family:'Inter';}
+  .connect-bar button:hover{opacity:0.88;}
+  .connect-bar button.secondary{background:transparent; color:var(--blue); border:1px solid var(--blue);}
   #status{font-size:12px; color:var(--ink-soft); width:100%; margin-top:2px;}
-  #status.err{color:var(--rust);}
-  #status.ok{color:var(--teal);}
+  #status.err{color:var(--orange);}
+  #status.ok{color:var(--green);}
 
-  header{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:1.5px solid var(--ink); padding-bottom:18px; margin-bottom:28px; flex-wrap:wrap; gap:12px;}
-  .brand-eyebrow{font-family:'Roboto Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--teal); margin:0 0 6px;}
-  h1{font-family:'Fraunces',serif; font-weight:500; font-size:32px; margin:0; letter-spacing:-0.01em;}
+  header{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:4px solid var(--green); padding-bottom:18px; margin-bottom:2px; flex-wrap:wrap; gap:12px; position:relative;}
+  header::after{content:""; display:block; position:absolute; left:0; right:0; bottom:-5px; height:1px; background:var(--ink);}
+  .logo-row{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  .logo-mark{font-family:'Inter Tight',sans-serif; font-weight:900; font-size:15px; letter-spacing:-0.02em; color:var(--ink);}
+  .brand-eyebrow{font-family:'Inter',sans-serif; font-weight:600; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--green); margin:0 0 6px;}
+  h1{font-family:'Inter Tight',sans-serif; font-weight:900; font-size:34px; margin:0; letter-spacing:-0.01em; line-height:0.8;}
   .meta{text-align:right; font-size:13px; color:var(--ink-soft); line-height:1.5;}
-  .meta strong{color:var(--ink); font-weight:600;}
+  .meta strong{color:var(--ink); font-weight:700;}
 
-  .kpi-row{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:36px;}
-  .kpi-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:18px 20px; box-shadow:var(--shadow);}
+  .kpi-row{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:32px 0 36px;}
+  .kpi-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:18px 20px; box-shadow:var(--shadow); border-top:4px solid var(--green);}
   .kpi-label{font-size:12px; color:var(--ink-soft); margin:0 0 8px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600;}
-  .kpi-value{font-family:'Fraunces',serif; font-size:30px; font-weight:500; margin:0;}
+  .kpi-value{font-family:'Inter Tight',sans-serif; font-size:28px; font-weight:900; margin:0; line-height:0.85;}
   .kpi-sub{font-size:12px; color:var(--ink-soft); margin-top:4px;}
 
   section{margin-bottom:36px;}
   .section-head{display:flex; align-items:baseline; justify-content:space-between; border-bottom:1px solid var(--rule); padding-bottom:8px; margin-bottom:16px;}
-  .section-title{font-family:'Fraunces',serif; font-size:18px; font-weight:500; margin:0;}
+  .section-title{font-family:'Inter',sans-serif; font-size:15px; font-weight:700; margin:0; line-height:1;}
   .section-note{font-size:12px; color:var(--ink-soft); margin:0;}
 
   .meter-card, .streak-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:6px 20px;}
   .meter-row, .streak-row{display:flex; align-items:center; gap:16px; padding:14px 0; border-bottom:1px solid var(--rule);}
   .meter-row:last-child, .streak-row:last-child{border-bottom:none;}
-  .meter-name, .streak-name{width:150px; flex-shrink:0; font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px;}
+  .meter-name, .streak-name{width:150px; flex-shrink:0; font-weight:700; font-size:14px; display:flex; align-items:center; gap:8px;}
   .dot-swatch{width:9px; height:9px; border-radius:50%; display:inline-block; flex-shrink:0;}
-  .meter-track{flex:1; height:10px; background:var(--teal-soft); border-radius:5px; overflow:hidden;}
+  .meter-track{flex:1; height:10px; background:var(--green-tint); border-radius:5px; overflow:hidden;}
   .meter-fill{height:100%; border-radius:5px;}
-  .meter-figs{width:150px; text-align:right; font-family:'Roboto Mono',monospace; font-size:13px; flex-shrink:0;}
+  .meter-figs{width:150px; text-align:right; font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-weight:600; font-size:13px; flex-shrink:0;}
 
   .streak-dots{display:flex; gap:8px; flex:1; flex-wrap:wrap;}
   .streak-dot{width:15px; height:15px; border-radius:50%; flex-shrink:0;}
-  .dot-hit{background:var(--teal);}
-  .dot-building{background:var(--gold-soft); border:2px solid var(--gold);}
+  .dot-hit{background:var(--green);}
+  .dot-building{background:var(--orange-tint); border:2px solid var(--orange);}
   .dot-nodata{background:transparent; border:1.5px dashed var(--rule);}
-  .trend-badge{width:170px; text-align:right; font-size:12px; font-weight:600; flex-shrink:0;}
-  .trend-up{color:var(--teal);}
+  .trend-badge{width:170px; text-align:right; font-size:12px; font-weight:700; flex-shrink:0;}
+  .trend-up{color:var(--green);}
   .trend-flat{color:var(--ink-soft);}
-  .legend-line{font-size:11.5px; color:var(--ink-soft); margin:0 0 14px;}
+  .legend-line{font-family:'Times New Roman',serif; font-style:italic; font-size:13px; color:var(--ink-soft); margin:0 0 14px;}
   .legend-line .dot-inline{display:inline-block; width:9px; height:9px; border-radius:50%; margin:0 4px -1px 10px;}
 
   .chart-grid{display:grid; grid-template-columns:1.2fr 1fr; gap:20px;}
@@ -71,13 +76,13 @@
   .chart-holder{position:relative; height:220px;}
 
   table{width:100%; border-collapse:collapse; background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; overflow:hidden;}
-  th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); font-weight:600; padding:12px 16px; border-bottom:1.5px solid var(--ink);}
-  th.num, td.num{text-align:right; font-family:'Roboto Mono',monospace;}
+  th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); font-weight:700; padding:12px 16px; border-bottom:2px solid var(--ink);}
+  th.num, td.num{text-align:right; font-family:'Inter',sans-serif; font-variant-numeric:tabular-nums; font-weight:600;}
   td{padding:12px 16px; font-size:14px; border-bottom:1px solid var(--rule);}
   tr:last-child td{border-bottom:none;}
 
   .empty-state{background:var(--paper-raised); border:1px dashed var(--rule); border-radius:6px; padding:40px 24px; text-align:center; color:var(--ink-soft); font-size:14px;}
-  footer{margin-top:40px; padding-top:16px; border-top:1px solid var(--rule); font-size:11.5px; color:var(--ink-soft); text-align:center;}
+  footer{margin-top:40px; padding-top:16px; border-top:1px solid var(--rule); font-family:'Times New Roman',serif; font-style:italic; font-size:12.5px; color:var(--ink-soft); text-align:center;}
 
   @media (max-width:720px){
     .kpi-row{grid-template-columns:1fr;}
@@ -100,6 +105,7 @@
 
   <header>
     <div>
+      <div class="logo-row"><span class="logo-mark">altruist</span></div>
       <p class="brand-eyebrow">Cash Operations · Team Ledger</p>
       <h1>Cash Team Performance</h1>
     </div>
@@ -185,7 +191,7 @@ let TARGET = 288;
 const DEFAULT_SHEET_ID = '1G-veIFLvjtBhSELGF9uGjZG_yIWxNZX3Fu_6WfJUvcU';
 let barChartInstance = null;
 let lineChartInstance = null;
-const PALETTE = ['#2B3D63','#0F6E68','#B8873A','#6B4B7A','#A5573B','#3E6B8A'];
+const PALETTE = ['#000000','#01BC48','#5667FF','#FF6624','#7A8091'];
 
 function extractSheetId(input){
   input = input.trim();
@@ -226,16 +232,22 @@ async function fetchSheetTab(sheetId, tabName){
 
 function toISODate(raw){
   if(!raw) return null;
-  let d = new Date(raw);
-  if(isNaN(d)){
-    const parts = raw.split(/[\/\-]/);
-    if(parts.length === 3){
-      let [a,b,c] = parts;
-      if(c.length === 4) d = new Date(`${c}-${a.padStart(2,'0')}-${b.padStart(2,'0')}`);
-    }
-  }
+  raw = String(raw).trim();
+  // ISO format: 2026-07-14 (optionally with a time component after it)
+  let m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  // US slash format: 7/14/2026 or 07/14/2026
+  m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m) return `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+  // last-resort fallback: use UTC getters so we never shift a day due to local timezone
+  const d = new Date(raw);
   if(isNaN(d)) return null;
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth()+1).padStart(2,'0') + '-' + String(d.getUTCDate()).padStart(2,'0');
+}
+
+function formatDateLabel(iso, opts){
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y, m-1, d).toLocaleDateString('en-US', opts || {month:'short', day:'numeric', year:'numeric'});
 }
 
 function setStatus(msg, kind){
@@ -309,11 +321,11 @@ function renderDashboard(series, allDates){
   });
 
   document.getElementById('dateRangeLabel').textContent =
-    `${new Date(allDates[0]).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} – ${new Date(latestDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+    `${formatDateLabel(allDates[0])} – ${formatDateLabel(latestDate)}`;
   document.getElementById('targetLabel').textContent = `${TARGET} pts / person`;
-  document.getElementById('meterDateNote').textContent = `${new Date(allDates[0]).toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${new Date(latestDate).toLocaleDateString('en-US',{month:'short',day:'numeric'})} · target ${TARGET} pts/day`;
+  document.getElementById('meterDateNote').textContent = `${formatDateLabel(allDates[0],{month:'short',day:'numeric'})} – ${formatDateLabel(latestDate,{month:'short',day:'numeric'})} · target ${TARGET} pts/day`;
   document.getElementById('streakRangeNote').textContent = `last ${last5.length} logged day${last5.length>1?'s':''}`;
-  document.getElementById('tableDateNote').textContent = new Date(latestDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  document.getElementById('tableDateNote').textContent = formatDateLabel(latestDate,{month:'short',day:'numeric',year:'numeric'});
 
   const todayPoints = {};
   employees.forEach(e => todayPoints[e] = series[e][latestDate] || 0);
@@ -340,7 +352,7 @@ function renderDashboard(series, allDates){
   });
   [...employees].sort((a,b)=>periodStats[b].pct-periodStats[a].pct).forEach(e=>{
     const { pct, avgPts, daysLogged } = periodStats[e];
-    const fillColor = pct >= 100 ? '#0F6E68' : '#C9A24B';
+    const fillColor = pct >= 100 ? '#01BC48' : '#FF6624';
     const row = document.createElement('div');
     row.className = 'meter-row';
     row.innerHTML = `
@@ -385,7 +397,7 @@ function renderDashboard(series, allDates){
     type:'bar',
     data:{ labels: employees, datasets:[{ data: employees.map(e=>todayPoints[e]), backgroundColor: employees.map(e=>colors[e]), borderRadius:4, maxBarThickness:44 }]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ y:{ beginAtZero:true, grid:{color:'#E5E1D4'} }, x:{ grid:{display:false} } } }
+      scales:{ y:{ beginAtZero:true, grid:{color:'rgba(0,0,0,0.08)'} }, x:{ grid:{display:false} } } }
   });
 
   // line chart
@@ -395,7 +407,7 @@ function renderDashboard(series, allDates){
     data:{ labels: dateLabels, datasets: employees.map(e=>({ label:e, data: last5.map(d=>series[e][d] !== undefined ? series[e][d] : null), borderColor: colors[e], backgroundColor:'transparent', borderWidth:2.5, pointRadius:3, tension:0.3, spanGaps:true })) },
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ display:true, position:'bottom', labels:{ boxWidth:8, boxHeight:8, font:{size:10.5}, usePointStyle:true } } },
-      scales:{ y:{ beginAtZero:true, grid:{color:'#E5E1D4'} }, x:{ grid:{display:false} } } }
+      scales:{ y:{ beginAtZero:true, grid:{color:'rgba(0,0,0,0.08)'} }, x:{ grid:{display:false} } } }
   });
 
   // table
