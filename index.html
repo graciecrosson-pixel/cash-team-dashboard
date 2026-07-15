@@ -158,9 +158,20 @@
   </div>
 
   <div id="dashboardBody" style="display:none;">
+    <section>
+      <div class="section-head">
+        <p class="section-title">Previous day totals</p>
+        <p class="section-note" id="tableDateNote"></p>
+      </div>
+      <table>
+        <thead><tr><th>Employee</th><th class="num">Points</th><th class="num">% of target</th></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </section>
+
     <div class="kpi-row">
       <div class="kpi-card">
-        <p class="kpi-label">Total points, this period</p>
+        <p class="kpi-label">Total points, month-to-date</p>
         <p class="kpi-value" id="kpiTotal">–</p>
         <p class="kpi-sub" id="kpiTotalSub">across all team members</p>
       </div>
@@ -170,7 +181,7 @@
         <p class="kpi-sub">measured across every logged day</p>
       </div>
       <div class="kpi-card">
-        <p class="kpi-label">Most active on latest day</p>
+        <p class="kpi-label">Most active, previous day</p>
         <p class="kpi-value" id="kpiTop">–</p>
         <p class="kpi-sub" id="kpiTopSub"></p>
       </div>
@@ -178,7 +189,7 @@
 
     <section>
       <div class="section-head">
-        <p class="section-title">Period-to-date progress toward target</p>
+        <p class="section-title">Month-to-date progress toward target</p>
         <p class="section-note" id="meterDateNote"></p>
       </div>
       <div class="meter-card" id="meterCard"></div>
@@ -187,7 +198,7 @@
     <section>
       <div class="section-head">
         <p class="section-title">Personal bests</p>
-        <p class="section-note">best single day, this period</p>
+        <p class="section-note">best single day, month-to-date</p>
       </div>
       <div class="best-card" id="bestCard"></div>
     </section>
@@ -195,7 +206,7 @@
     <section>
       <div class="section-head">
         <p class="section-title">Task mix by person</p>
-        <p class="section-note">share of points by task type, this period</p>
+        <p class="section-note">share of points by task type, month-to-date</p>
       </div>
       <div class="mix-card" id="mixCard"></div>
       <div class="mix-legend" id="mixLegend"></div>
@@ -203,7 +214,7 @@
 
     <section>
       <div class="section-head">
-        <p class="section-title">Top tasks, latest day</p>
+        <p class="section-title">Top tasks, previous day</p>
         <p class="section-note" id="tasksDateNote"></p>
       </div>
       <div class="task-grid" id="taskGrid"></div>
@@ -225,7 +236,7 @@
 
     <div class="chart-grid" style="margin-bottom:36px;">
       <div class="chart-card">
-        <h3>Points by employee — latest day</h3>
+        <h3>Points by employee — previous day</h3>
         <div class="chart-holder"><canvas id="barChart"></canvas></div>
       </div>
       <div class="chart-card">
@@ -233,17 +244,6 @@
         <div class="chart-holder"><canvas id="lineChart"></canvas></div>
       </div>
     </div>
-
-    <section>
-      <div class="section-head">
-        <p class="section-title">Today's totals</p>
-        <p class="section-note" id="tableDateNote"></p>
-      </div>
-      <table>
-        <thead><tr><th>Employee</th><th class="num">Points</th><th class="num">% of target</th></tr></thead>
-        <tbody id="tableBody"></tbody>
-      </table>
-    </section>
   </div>
 
   <div id="emptyState" class="empty-state">
@@ -319,12 +319,14 @@ function formatDateLabel(iso, opts){
 
 function bucketType(rawType){
   const t = (rawType||'').toLowerCase();
+  if(t.includes('internal transfer')) return 'Internal transfers';
+  if(t.includes('ach')) return 'ACH';
   if(t.includes('check')) return 'Check';
-  if(t.includes('internal transfer')) return 'Internal transfer';
+  if(t.includes('wire')) return 'Wire';
   if(t.includes('treasury')) return 'Treasury';
   return 'Other';
 }
-const BUCKET_COLORS = { 'Check':'#000000', 'Internal transfer':'#01BC48', 'Treasury':'#5667FF', 'Other':'#FF6624' };
+const BUCKET_COLORS = { 'Internal transfers':'#000000', 'ACH':'#01BC48', 'Check':'#5667FF', 'Wire':'#FF6624', 'Treasury':'#4A4A4A', 'Other':'#B4B2A9' };
 
 function taskIcon(name){
   const n = (name||'').toLowerCase();
@@ -370,31 +372,42 @@ async function loadDashboard(){
     const dateSet = new Set();
     const taskMixByEmployee = {};
     const perEmpDateTask = {};
+    const parsedRows = [];
+    let maxIso = null;
     for(let i=1;i<logRows.length;i++){
       const r = logRows[i];
       const iso = toISODate(r[dateIdx]);
       const emp = (r[empIdx]||'').trim();
       const pts = parseFloat(r[ptsIdx]);
       if(!iso || !emp || isNaN(pts)) continue;
-      dateSet.add(iso);
-      if(!series[emp]) series[emp] = {};
-      series[emp][iso] = (series[emp][iso] || 0) + pts;
+      if(!maxIso || iso > maxIso) maxIso = iso;
+      parsedRows.push({
+        iso, emp, pts,
+        type: typeIdx !== -1 ? (r[typeIdx]||'').trim() : '',
+        taskName: taskIdx !== -1 ? (r[taskIdx]||'').trim() : '',
+        qty: qtyIdx !== -1 ? (parseFloat(r[qtyIdx]) || 0) : 0
+      });
+    }
 
-      const type = typeIdx !== -1 ? (r[typeIdx]||'').trim() : '';
-      const bucket = bucketType(type);
-      if(!taskMixByEmployee[emp]) taskMixByEmployee[emp] = {};
-      taskMixByEmployee[emp][bucket] = (taskMixByEmployee[emp][bucket] || 0) + pts;
+    const currentMonth = maxIso ? maxIso.slice(0,7) : null;
 
-      if(taskIdx !== -1){
-        const taskName = (r[taskIdx]||'').trim();
-        const qty = qtyIdx !== -1 ? (parseFloat(r[qtyIdx]) || 0) : 0;
-        if(taskName){
-          if(!perEmpDateTask[emp]) perEmpDateTask[emp] = {};
-          if(!perEmpDateTask[emp][iso]) perEmpDateTask[emp][iso] = {};
-          if(!perEmpDateTask[emp][iso][taskName]) perEmpDateTask[emp][iso][taskName] = { qty:0, pts:0 };
-          perEmpDateTask[emp][iso][taskName].qty += qty;
-          perEmpDateTask[emp][iso][taskName].pts += pts;
-        }
+    for(const row of parsedRows){
+      if(currentMonth && row.iso.slice(0,7) !== currentMonth) continue;
+
+      dateSet.add(row.iso);
+      if(!series[row.emp]) series[row.emp] = {};
+      series[row.emp][row.iso] = (series[row.emp][row.iso] || 0) + row.pts;
+
+      const bucket = bucketType(row.type);
+      if(!taskMixByEmployee[row.emp]) taskMixByEmployee[row.emp] = {};
+      taskMixByEmployee[row.emp][bucket] = (taskMixByEmployee[row.emp][bucket] || 0) + row.pts;
+
+      if(row.taskName){
+        if(!perEmpDateTask[row.emp]) perEmpDateTask[row.emp] = {};
+        if(!perEmpDateTask[row.emp][row.iso]) perEmpDateTask[row.emp][row.iso] = {};
+        if(!perEmpDateTask[row.emp][row.iso][row.taskName]) perEmpDateTask[row.emp][row.iso][row.taskName] = { qty:0, pts:0 };
+        perEmpDateTask[row.emp][row.iso][row.taskName].qty += row.qty;
+        perEmpDateTask[row.emp][row.iso][row.taskName].pts += row.pts;
       }
     }
 
@@ -457,7 +470,7 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask){
   document.getElementById('kpiTopSub').textContent = `${todayPoints[topEmp]} pts on ${dateLabels[dateLabels.length-1]}`;
 
   document.getElementById('milestoneBanner').style.display = 'flex';
-  document.getElementById('milestoneText').textContent = `The team has logged ${Math.round(totalPoints).toLocaleString()} points together this period`;
+  document.getElementById('milestoneText').textContent = `The team has logged ${Math.round(totalPoints).toLocaleString()} points together this month`;
 
   // meters
   const meterCard = document.getElementById('meterCard');
@@ -501,7 +514,7 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask){
   // task mix by person
   const mixCard = document.getElementById('mixCard');
   mixCard.innerHTML = '';
-  const bucketOrder = ['Check','Internal transfer','Treasury','Other'];
+  const bucketOrder = ['Internal transfers','ACH','Check','Wire','Treasury','Other'];
   employees.forEach(e=>{
     const mix = taskMixByEmployee[e] || {};
     const total = bucketOrder.reduce((sum,b) => sum + (mix[b]||0), 0) || 1;
