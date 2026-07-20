@@ -123,8 +123,7 @@
   .roster-row:last-child{border-bottom:none;}
   .roster-task{font-size:13.5px;}
   .roster-right{display:flex; align-items:center; gap:8px;}
-  .roster-badge{font-size:12px; font-weight:600; padding:3px 10px; border-radius:100px; white-space:nowrap;}
-  .roster-pending{background:var(--paper); color:var(--ink-soft); border:1px dashed var(--rule);}
+  .roster-badge{font-size:12px; font-weight:700; padding:4px 12px; border-radius:100px; white-space:nowrap;}
 
   .chart-grid{display:grid; grid-template-columns:1.2fr 1fr; gap:20px;}
   .chart-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:18px 20px;}
@@ -228,15 +227,6 @@
 
     <section>
       <div class="section-head">
-        <p class="section-title">Task mix by person</p>
-        <p class="section-note">share of points by task type, month-to-date</p>
-      </div>
-      <div class="mix-card" id="mixCard"></div>
-      <div class="mix-legend" id="mixLegend"></div>
-    </section>
-
-    <section>
-      <div class="section-head">
         <p class="section-title">Top tasks, selected day</p>
         <p class="section-note" id="tasksDateNote"></p>
       </div>
@@ -289,8 +279,6 @@ const DEFAULT_SHEET_ID = '1G-veIFLvjtBhSELGF9uGjZG_yIWxNZX3Fu_6WfJUvcU';
 let barChartInstance = null;
 let lineChartInstance = null;
 const PALETTE = ['#000000','#01BC48','#5667FF','#FF6624','#7A8091'];
-const ROSTER_TINTS = ['#F1EFE8','#C8F9DA','#E4E7FF','#FFE8DE','#F1EFE8'];
-const ROSTER_TEXT  = ['#2C2C2A','#04342C','#042C53','#4A1B0C','#2C2C2A'];
 const FIXED_TASKS = [
   { name:'IntraFi Settlement' },
   { name:'IntraFi Recon' },
@@ -578,32 +566,6 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, ot
     bestCard.appendChild(tile);
   });
 
-  // task mix by person (month-wide, not affected by day selection)
-  const mixCard = document.getElementById('mixCard');
-  mixCard.innerHTML = '';
-  const bucketOrder = ['Internal transfers','ACH','Check','Wire','Treasury','Other'];
-  employees.forEach(e=>{
-    const mix = taskMixByEmployee[e] || {};
-    const total = bucketOrder.reduce((sum,b) => sum + (mix[b]||0), 0) || 1;
-    const row = document.createElement('div');
-    row.className = 'mix-row';
-    const segs = bucketOrder.map(b => {
-      const pct = Math.round((mix[b]||0)/total*100);
-      if(pct <= 0) return '';
-      const pts = Math.round(mix[b]||0);
-      let tooltip = `${b}: ${pts} pts (${pct}%)`;
-      if(b === 'Other' && otherTypesByEmployee[e] && otherTypesByEmployee[e].size){
-        tooltip += ` — includes ${[...otherTypesByEmployee[e]].sort().join(', ')}`;
-      }
-      return `<div style="width:${pct}%; background:${BUCKET_COLORS[b]};" title="${tooltip}"></div>`;
-    }).join('');
-    row.innerHTML = `<p class="mix-name">${e}</p><div class="mix-bar">${segs}</div>`;
-    mixCard.appendChild(row);
-  });
-  document.getElementById('mixLegend').innerHTML = bucketOrder.map(b =>
-    `<span><span class="sw" style="background:${BUCKET_COLORS[b]};"></span>${b}</span>`
-  ).join('');
-
   // streak dots (month-wide, last 5 logged days)
   const streakCard = document.getElementById('streakCard');
   streakCard.innerHTML = '';
@@ -747,31 +709,41 @@ function renderForDate(selectedDate){
     tbody.appendChild(tr);
   });
 
-  // fixed daily task checklist
+  // fixed daily task checklist — only show tasks actually logged that day
   document.getElementById('taskListDateNote').textContent = formatDateLabel(selectedDate,{month:'short',day:'numeric',year:'numeric'});
   const [ty,tm,td] = selectedDate.split('-').map(Number);
   const isMonday = new Date(ty,tm-1,td).getDay() === 1;
   const taskListCard = document.getElementById('taskListCard');
   taskListCard.innerHTML = '';
+  const ROW_TINTS = ['#F1EFE8','#EAF9F0','#EEF0FF','#FFF1EA','#F1EFE8'];
+  const BADGE_TEXT = ['#FFFFFF','#04342C','#FFFFFF','#4A1B0C','#FFFFFF'];
+  let anyShown = false;
   FIXED_TASKS.filter(t => !t.mondayOnly || isMonday).forEach(t=>{
     const assignees = findTaskAssignees(selectedDate, t.name, t.category);
+    if(!assignees.length) return;
+    anyShown = true;
+    const badgesHtml = assignees.map(e=>{
+      const idx = employees.indexOf(e) % ROW_TINTS.length;
+      return `<span class="roster-badge" style="background:${colors[e]}; color:${BADGE_TEXT[idx]};">${e}</span>`;
+    }).join('');
+    const borderColor = colors[assignees[0]];
+    const rowIdx = employees.indexOf(assignees[0]) % ROW_TINTS.length;
     const row = document.createElement('div');
     row.className = 'roster-row';
-    if(assignees.length){
-      const badgesHtml = assignees.map(e=>{
-        const idx = employees.indexOf(e) % ROSTER_TINTS.length;
-        return `<span class="roster-badge" style="background:${ROSTER_TINTS[idx]}; color:${ROSTER_TEXT[idx]};">${e}</span>`;
-      }).join('');
-      row.innerHTML = `
-        <span class="roster-task">${t.name}</span>
-        <div class="roster-right"><i class="ti ti-check" style="color:#173404; font-size:14px;" aria-hidden="true"></i>${badgesHtml}</div>`;
-    } else {
-      row.innerHTML = `
-        <span class="roster-task" style="color:var(--ink-soft);">${t.name}</span>
-        <span class="roster-badge roster-pending">Not completed yet</span>`;
-    }
+    row.style.background = ROW_TINTS[rowIdx];
+    row.style.borderRadius = '8px';
+    row.style.marginBottom = '8px';
+    row.style.border = 'none';
+    row.style.borderLeft = `4px solid ${borderColor}`;
+    row.style.padding = '12px 14px';
+    row.innerHTML = `
+      <span class="roster-task" style="font-weight:600;">${t.name}</span>
+      <div class="roster-right">${badgesHtml}</div>`;
     taskListCard.appendChild(row);
   });
+  if(!anyShown){
+    taskListCard.innerHTML = `<p class="section-note" style="padding:12px 0;">No checklist tasks logged for this day yet.</p>`;
+  }
 }
 
 document.getElementById('connectBtn').addEventListener('click', loadDashboard);
