@@ -116,6 +116,16 @@
   .task-item span.lbl{font-size:12.5px; flex:1;}
   .task-item span.qty{font-size:12px; color:var(--ink-soft);}
 
+  .day-select{font-family:'Inter',sans-serif; font-size:12px; font-weight:600; color:var(--ink); border:1px solid var(--rule); border-radius:5px; padding:5px 10px; background:var(--paper-raised); cursor:pointer;}
+
+  .roster-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:6px 20px;}
+  .roster-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--rule);}
+  .roster-row:last-child{border-bottom:none;}
+  .roster-task{font-size:13.5px;}
+  .roster-right{display:flex; align-items:center; gap:8px;}
+  .roster-badge{font-size:12px; font-weight:600; padding:3px 10px; border-radius:100px; white-space:nowrap;}
+  .roster-pending{background:var(--paper); color:var(--ink-soft); border:1px dashed var(--rule);}
+
   .chart-grid{display:grid; grid-template-columns:1.2fr 1fr; gap:20px;}
   .chart-card{background:var(--paper-raised); border:1px solid var(--rule); border-radius:6px; padding:18px 20px;}
   .chart-card h3{font-size:13px; margin:0 0 12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.05em; font-weight:600;}
@@ -172,8 +182,8 @@
   <div id="dashboardBody" style="display:none;">
     <section>
       <div class="section-head">
-        <p class="section-title">Previous day totals</p>
-        <p class="section-note" id="tableDateNote"></p>
+        <p class="section-title">Day totals</p>
+        <select id="daySelect" class="day-select"></select>
       </div>
       <table>
         <thead><tr><th>Employee</th><th class="num">Points</th><th class="num">% of target</th></tr></thead>
@@ -193,7 +203,7 @@
         <p class="kpi-sub">measured across every logged day</p>
       </div>
       <div class="kpi-card">
-        <p class="kpi-label">Most active, previous day</p>
+        <p class="kpi-label">Most active, selected day</p>
         <p class="kpi-value" id="kpiTop">–</p>
         <p class="kpi-sub" id="kpiTopSub"></p>
       </div>
@@ -201,10 +211,10 @@
 
     <section>
       <div class="section-head">
-        <p class="section-title">Previous day vs. month-to-date average</p>
+        <p class="section-title">Selected day vs. month-to-date average</p>
         <p class="section-note" id="meterDateNote"></p>
       </div>
-      <p class="section-note" style="margin-bottom:14px;">Center tick is each person's own average this month. Bar shows how their previous day compared to it.</p>
+      <p class="section-note" style="margin-bottom:14px;">Center tick is each person's own average this month. Bar shows how the selected day compared to it.</p>
       <div class="mix-card" id="meterCard"></div>
     </section>
 
@@ -227,10 +237,18 @@
 
     <section>
       <div class="section-head">
-        <p class="section-title">Top tasks, previous day</p>
+        <p class="section-title">Top tasks, selected day</p>
         <p class="section-note" id="tasksDateNote"></p>
       </div>
       <div class="task-grid" id="taskGrid"></div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <p class="section-title">Task list</p>
+        <p class="section-note" id="taskListDateNote"></p>
+      </div>
+      <div class="roster-card" id="taskListCard"></div>
     </section>
 
     <section>
@@ -248,7 +266,7 @@
 
     <div class="chart-grid" style="margin-bottom:36px;">
       <div class="chart-card">
-        <h3>Points by employee — previous day</h3>
+        <h3>Points by employee — selected day</h3>
         <div class="chart-holder"><canvas id="barChart"></canvas></div>
       </div>
       <div class="chart-card">
@@ -271,6 +289,42 @@ const DEFAULT_SHEET_ID = '1G-veIFLvjtBhSELGF9uGjZG_yIWxNZX3Fu_6WfJUvcU';
 let barChartInstance = null;
 let lineChartInstance = null;
 const PALETTE = ['#000000','#01BC48','#5667FF','#FF6624','#7A8091'];
+const ROSTER_TINTS = ['#F1EFE8','#C8F9DA','#E4E7FF','#FFE8DE','#F1EFE8'];
+const ROSTER_TEXT  = ['#2C2C2A','#04342C','#042C53','#4A1B0C','#2C2C2A'];
+const FIXED_TASKS = [
+  { name:'IntraFi Settlement' },
+  { name:'IntraFi Recon' },
+  { name:'OCC Recon' },
+  { name:'Bank Recon' },
+  { name:'Intra-day Liquidity - Morning' },
+  { name:'Intra-day Liquidity - Afternoon' },
+  { name:'Intra-day Liquidity - EOD' },
+  { name:'ACH Return', category:'Treasury' },
+  { name:'Incoming Wires' },
+  { name:'Returned Checks' },
+  { name:'15c3-3 money movement', mondayOnly:true },
+  { name:'15c3-3 NIGO Checks', mondayOnly:true },
+  { name:'Email Queue' },
+  { name:'Statement Review' }
+];
+
+function findTaskAssignees(selectedDate, taskName, requiredCategory){
+  const target = taskName.trim().toLowerCase();
+  const reqCat = requiredCategory ? requiredCategory.trim().toLowerCase() : null;
+  const matches = [];
+  DASH.employees.forEach(e=>{
+    const dayTasks = (DASH.perEmpDateTask[e] && DASH.perEmpDateTask[e][selectedDate]) || {};
+    Object.keys(dayTasks).forEach(k=>{
+      if(k.trim().toLowerCase() !== target) return;
+      if(reqCat){
+        const cats = (dayTasks[k].categories || []).map(c=>c.toLowerCase());
+        if(!cats.includes(reqCat)) return;
+      }
+      matches.push(e);
+    });
+  });
+  return matches;
+}
 
 function extractSheetId(input){
   input = input.trim();
@@ -378,6 +432,7 @@ async function loadDashboard(){
     const taskIdx = header.findIndex(h => h.includes('task'));
     const qtyIdx = header.findIndex(h => h.includes('quantity'));
     const typeIdx = header.findIndex(h => h.includes('type'));
+    const categoryIdx = header.findIndex(h => h.includes('category'));
     if(dateIdx === -1 || empIdx === -1 || ptsIdx === -1) throw new Error('Could not find Date, Employee_Name, or Points columns in Daily_Task_Log.');
 
     const series = {};
@@ -398,7 +453,8 @@ async function loadDashboard(){
         iso, emp, pts,
         type: typeIdx !== -1 ? (r[typeIdx]||'').trim() : '',
         taskName: taskIdx !== -1 ? (r[taskIdx]||'').trim() : '',
-        qty: qtyIdx !== -1 ? (parseFloat(r[qtyIdx]) || 0) : 0
+        qty: qtyIdx !== -1 ? (parseFloat(r[qtyIdx]) || 0) : 0,
+        category: categoryIdx !== -1 ? (r[categoryIdx]||'').trim() : ''
       });
     }
 
@@ -422,9 +478,12 @@ async function loadDashboard(){
       if(row.taskName){
         if(!perEmpDateTask[row.emp]) perEmpDateTask[row.emp] = {};
         if(!perEmpDateTask[row.emp][row.iso]) perEmpDateTask[row.emp][row.iso] = {};
-        if(!perEmpDateTask[row.emp][row.iso][row.taskName]) perEmpDateTask[row.emp][row.iso][row.taskName] = { qty:0, pts:0 };
+        if(!perEmpDateTask[row.emp][row.iso][row.taskName]) perEmpDateTask[row.emp][row.iso][row.taskName] = { qty:0, pts:0, categories:[] };
         perEmpDateTask[row.emp][row.iso][row.taskName].qty += row.qty;
         perEmpDateTask[row.emp][row.iso][row.taskName].pts += row.pts;
+        if(row.category && !perEmpDateTask[row.emp][row.iso][row.taskName].categories.includes(row.category)){
+          perEmpDateTask[row.emp][row.iso][row.taskName].categories.push(row.category);
+        }
       }
     }
 
@@ -453,6 +512,8 @@ async function loadDashboard(){
   }
 }
 
+let DASH = null;
+
 function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, otherTypesByEmployee){
   const employees = Object.keys(series).sort();
   const colors = {};
@@ -462,22 +523,14 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, ot
   const latestDate = allDates[allDates.length-1];
 
   const avgPtsByEmployee = {};
-  const trendByEmployee = {};
   employees.forEach(e=>{
     const daysLogged = Object.keys(series[e]).length;
     const totalPts = Object.values(series[e]).reduce((a,b)=>a+b,0);
-    const avgPts = totalPts / daysLogged;
-    avgPtsByEmployee[e] = { avgPts, daysLogged };
-    const todayVal = series[e][latestDate];
-    if(daysLogged < 1 || todayVal === undefined){
-      trendByEmployee[e] = { diffPct: null, html: `<span class="trend-flat">not enough history yet</span>` };
-    } else {
-      const diffPct = Math.round((todayVal-avgPts)/avgPts*100);
-      const cls = diffPct >= 0 ? 'trend-up' : 'trend-flat';
-      const word = diffPct >= 0 ? 'above' : 'below';
-      trendByEmployee[e] = { diffPct, html: `<span class="${cls}">${Math.abs(diffPct)}% ${word} own avg</span>` };
-    }
+    avgPtsByEmployee[e] = { avgPts: totalPts / daysLogged, daysLogged };
   });
+
+  DASH = { series, employees, colors, avgPtsByEmployee, perEmpDateTask, allDates };
+
   const dateLabels = last5.map(d => {
     const [y,m,dd] = d.split('-');
     return new Date(y,m-1,dd).toLocaleDateString('en-US',{month:'short', day:'numeric'});
@@ -486,58 +539,20 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, ot
   document.getElementById('dateRangeLabel').textContent =
     `${formatDateLabel(allDates[0])} – ${formatDateLabel(latestDate)}`;
   document.getElementById('targetLabel').textContent = `${TARGET} pts / person`;
-  document.getElementById('meterDateNote').textContent = formatDateLabel(latestDate,{month:'short',day:'numeric',year:'numeric'});
   document.getElementById('streakRangeNote').textContent = `last ${last5.length} logged day${last5.length>1?'s':''}`;
-  document.getElementById('tableDateNote').textContent = formatDateLabel(latestDate,{month:'short',day:'numeric',year:'numeric'});
-
-  const todayPoints = {};
-  employees.forEach(e => todayPoints[e] = series[e][latestDate] || 0);
 
   const totalPoints = employees.reduce((sum,e) => sum + Object.values(series[e]).reduce((a,b)=>a+b,0), 0);
   const loggedDays = employees.reduce((sum,e) => sum + Object.keys(series[e]).length, 0);
   const avgPct = Math.round((totalPoints/(TARGET*loggedDays))*100);
-  const topEmp = employees.reduce((a,b) => todayPoints[a] > todayPoints[b] ? a : b);
 
   document.getElementById('kpiTotal').textContent = Math.round(totalPoints).toLocaleString() + ' pts';
   document.getElementById('kpiTotalSub').textContent = `across ${employees.length} team member${employees.length>1?'s':''}`;
   document.getElementById('kpiPct').textContent = avgPct + '%';
-  document.getElementById('kpiTop').textContent = topEmp;
-  document.getElementById('kpiTopSub').textContent = `${todayPoints[topEmp]} pts on ${dateLabels[dateLabels.length-1]}`;
 
   document.getElementById('milestoneBanner').style.display = 'flex';
   document.getElementById('milestoneText').textContent = `The team has logged ${Math.round(totalPoints).toLocaleString()} points together this month`;
 
-  // previous day vs month-to-date average, diverging bars
-  const meterCard = document.getElementById('meterCard');
-  meterCard.innerHTML = '';
-  const maxAbsPct = Math.max(20, ...employees.map(e => Math.abs(trendByEmployee[e].diffPct ?? 0)));
-  [...employees].sort((a,b) => (trendByEmployee[b].diffPct ?? -999) - (trendByEmployee[a].diffPct ?? -999)).forEach(e=>{
-    const avgPts = Math.round(avgPtsByEmployee[e].avgPts);
-    const prevPts = todayPoints[e];
-    const diffPct = trendByEmployee[e].diffPct;
-    const row = document.createElement('div');
-    row.className = 'div-row';
-    if(diffPct === null){
-      row.innerHTML = `
-        <div class="div-head"><span style="font-size:13.5px; font-weight:700;">${e}</span><span class="section-note">not enough history yet</span></div>
-        <div class="div-track"><div class="div-center"></div></div>`;
-    } else {
-      const halfWidthPct = Math.min(Math.abs(diffPct) / maxAbsPct * 50, 50);
-      const isUp = diffPct >= 0;
-      const barHtml = isUp
-        ? `<div class="div-bar-pos" style="width:${halfWidthPct}%;"></div><span class="div-pct" style="left:calc(50% + ${halfWidthPct}% + 6px); color:var(--green);">+${diffPct}%</span>`
-        : `<div class="div-bar-neg" style="width:${halfWidthPct}%;"></div><span class="div-pct" style="right:calc(50% + ${halfWidthPct}% + 6px); color:#7A6A5A;">${diffPct}%</span>`;
-      row.innerHTML = `
-        <div class="div-head">
-          <span style="font-size:13.5px; font-weight:700;">${e}</span>
-          <span class="section-note">avg <strong style="color:var(--ink);">${avgPts}</strong> pts/day &nbsp;·&nbsp; previous day <strong style="color:var(--ink);">${prevPts}</strong> pts</span>
-        </div>
-        <div class="div-track"><div class="div-center"></div>${barHtml}</div>`;
-    }
-    meterCard.appendChild(row);
-  });
-
-  // personal bests, as celebratory tiles
+  // personal bests, as celebratory tiles (month-wide, not affected by day selection)
   const bestCard = document.getElementById('bestCard');
   bestCard.innerHTML = '';
   const TILE_FILLS = ['#01BC48','#5667FF','#FF6624','#000000'];
@@ -563,7 +578,7 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, ot
     bestCard.appendChild(tile);
   });
 
-  // task mix by person
+  // task mix by person (month-wide, not affected by day selection)
   const mixCard = document.getElementById('mixCard');
   mixCard.innerHTML = '';
   const bucketOrder = ['Internal transfers','ACH','Check','Wire','Treasury','Other'];
@@ -589,12 +604,104 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, ot
     `<span><span class="sw" style="background:${BUCKET_COLORS[b]};"></span>${b}</span>`
   ).join('');
 
-  // top tasks, latest day
-  document.getElementById('tasksDateNote').textContent = formatDateLabel(latestDate,{month:'short',day:'numeric',year:'numeric'});
+  // streak dots (month-wide, last 5 logged days)
+  const streakCard = document.getElementById('streakCard');
+  streakCard.innerHTML = '';
+  employees.forEach(e=>{
+    const vals = last5.map(d => series[e][d] !== undefined ? series[e][d] : null);
+    const dotsHtml = vals.map(v=>{
+      if(v===null) return `<span class="streak-dot dot-nodata"></span>`;
+      return v >= TARGET ? `<span class="streak-dot dot-hit"></span>` : `<span class="streak-dot dot-building"></span>`;
+    }).join('');
+    const row = document.createElement('div');
+    row.className = 'streak-row';
+    row.innerHTML = `<div class="streak-name">${e}</div><div class="streak-dots">${dotsHtml}</div>`;
+    streakCard.appendChild(row);
+  });
+
+  // line chart (month-wide, last 5 logged days)
+  if(lineChartInstance) lineChartInstance.destroy();
+  lineChartInstance = new Chart(document.getElementById('lineChart'), {
+    type:'line',
+    data:{ labels: dateLabels, datasets: employees.map(e=>({ label:e, data: last5.map(d=>series[e][d] !== undefined ? series[e][d] : null), borderColor: colors[e], backgroundColor:'transparent', borderWidth:2.5, pointRadius:3, tension:0.3, spanGaps:true })) },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:true, position:'bottom', labels:{ boxWidth:8, boxHeight:8, font:{size:10.5}, usePointStyle:true } } },
+      scales:{ y:{ beginAtZero:true, grid:{color:'rgba(0,0,0,0.08)'} }, x:{ grid:{display:false} } } }
+  });
+
+  // populate the day selector and wire it up
+  const daySelect = document.getElementById('daySelect');
+  daySelect.innerHTML = allDates.map(d =>
+    `<option value="${d}">${formatDateLabel(d,{month:'short',day:'numeric'})}</option>`
+  ).join('');
+  daySelect.value = latestDate;
+  daySelect.onchange = () => renderForDate(daySelect.value);
+
+  renderForDate(latestDate);
+
+  document.getElementById('dashboardBody').style.display = 'block';
+  document.getElementById('emptyState').style.display = 'none';
+}
+
+function renderForDate(selectedDate){
+  const { series, employees, colors, avgPtsByEmployee, perEmpDateTask } = DASH;
+
+  const trendByEmployee = {};
+  employees.forEach(e=>{
+    const rawVal = series[e][selectedDate];
+    const avgPts = avgPtsByEmployee[e].avgPts;
+    if(rawVal === undefined){
+      trendByEmployee[e] = { diffPct: null };
+    } else {
+      trendByEmployee[e] = { diffPct: Math.round((rawVal-avgPts)/avgPts*100) };
+    }
+  });
+
+  const todayPoints = {};
+  employees.forEach(e => todayPoints[e] = series[e][selectedDate] || 0);
+  const topEmp = employees.reduce((a,b) => todayPoints[a] > todayPoints[b] ? a : b);
+  const selectedLabel = formatDateLabel(selectedDate,{month:'short',day:'numeric'});
+
+  document.getElementById('kpiTop').textContent = topEmp;
+  document.getElementById('kpiTopSub').textContent = `${todayPoints[topEmp]} pts on ${selectedLabel}`;
+
+  // diverging bars: selected day vs month-to-date average
+  const meterCard = document.getElementById('meterCard');
+  meterCard.innerHTML = '';
+  document.getElementById('meterDateNote').textContent = formatDateLabel(selectedDate,{month:'short',day:'numeric',year:'numeric'});
+  const maxAbsPct = Math.max(20, ...employees.map(e => Math.abs(trendByEmployee[e].diffPct ?? 0)));
+  [...employees].sort((a,b) => (trendByEmployee[b].diffPct ?? -999) - (trendByEmployee[a].diffPct ?? -999)).forEach(e=>{
+    const avgPts = Math.round(avgPtsByEmployee[e].avgPts);
+    const dayPts = todayPoints[e];
+    const diffPct = trendByEmployee[e].diffPct;
+    const row = document.createElement('div');
+    row.className = 'div-row';
+    if(diffPct === null){
+      row.innerHTML = `
+        <div class="div-head"><span style="font-size:13.5px; font-weight:700;">${e}</span><span class="section-note">no entry this day</span></div>
+        <div class="div-track"><div class="div-center"></div></div>`;
+    } else {
+      const halfWidthPct = Math.min(Math.abs(diffPct) / maxAbsPct * 50, 50);
+      const isUp = diffPct >= 0;
+      const barHtml = isUp
+        ? `<div class="div-bar-pos" style="width:${halfWidthPct}%;"></div><span class="div-pct" style="left:calc(50% + ${halfWidthPct}% + 6px); color:var(--green);">+${diffPct}%</span>`
+        : `<div class="div-bar-neg" style="width:${halfWidthPct}%;"></div><span class="div-pct" style="right:calc(50% + ${halfWidthPct}% + 6px); color:#7A6A5A;">${diffPct}%</span>`;
+      row.innerHTML = `
+        <div class="div-head">
+          <span style="font-size:13.5px; font-weight:700;">${e}</span>
+          <span class="section-note">avg <strong style="color:var(--ink);">${avgPts}</strong> pts/day &nbsp;·&nbsp; selected day <strong style="color:var(--ink);">${dayPts}</strong> pts</span>
+        </div>
+        <div class="div-track"><div class="div-center"></div>${barHtml}</div>`;
+    }
+    meterCard.appendChild(row);
+  });
+
+  // top tasks for the selected day
+  document.getElementById('tasksDateNote').textContent = formatDateLabel(selectedDate,{month:'short',day:'numeric',year:'numeric'});
   const taskGrid = document.getElementById('taskGrid');
   taskGrid.innerHTML = '';
   employees.forEach(e=>{
-    const dayTasks = (perEmpDateTask[e] && perEmpDateTask[e][latestDate]) || {};
+    const dayTasks = (perEmpDateTask[e] && perEmpDateTask[e][selectedDate]) || {};
     const topTwo = Object.entries(dayTasks).sort((a,b)=>b[1].pts-a[1].pts).slice(0,2);
     const pts = todayPoints[e];
     const pct = Math.round(pts/TARGET*100);
@@ -620,23 +727,7 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, ot
     taskGrid.appendChild(card);
   });
 
-  // streak
-  const streakCard = document.getElementById('streakCard');
-  streakCard.innerHTML = '';
-  employees.forEach(e=>{
-    const vals = last5.map(d => series[e][d] !== undefined ? series[e][d] : null);
-    const dotsHtml = vals.map(v=>{
-      if(v===null) return `<span class="streak-dot dot-nodata"></span>`;
-      return v >= TARGET ? `<span class="streak-dot dot-hit"></span>` : `<span class="streak-dot dot-building"></span>`;
-    }).join('');
-
-    const row = document.createElement('div');
-    row.className = 'streak-row';
-    row.innerHTML = `<div class="streak-name">${e}</div><div class="streak-dots">${dotsHtml}</div>`;
-    streakCard.appendChild(row);
-  });
-
-  // bar chart
+  // bar chart for the selected day
   if(barChartInstance) barChartInstance.destroy();
   barChartInstance = new Chart(document.getElementById('barChart'), {
     type:'bar',
@@ -645,17 +736,7 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, ot
       scales:{ y:{ beginAtZero:true, grid:{color:'rgba(0,0,0,0.08)'} }, x:{ grid:{display:false} } } }
   });
 
-  // line chart
-  if(lineChartInstance) lineChartInstance.destroy();
-  lineChartInstance = new Chart(document.getElementById('lineChart'), {
-    type:'line',
-    data:{ labels: dateLabels, datasets: employees.map(e=>({ label:e, data: last5.map(d=>series[e][d] !== undefined ? series[e][d] : null), borderColor: colors[e], backgroundColor:'transparent', borderWidth:2.5, pointRadius:3, tension:0.3, spanGaps:true })) },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ display:true, position:'bottom', labels:{ boxWidth:8, boxHeight:8, font:{size:10.5}, usePointStyle:true } } },
-      scales:{ y:{ beginAtZero:true, grid:{color:'rgba(0,0,0,0.08)'} }, x:{ grid:{display:false} } } }
-  });
-
-  // table
+  // day totals table
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = '';
   [...employees].sort((a,b)=>todayPoints[b]-todayPoints[a]).forEach(e=>{
@@ -664,6 +745,32 @@ function renderDashboard(series, allDates, taskMixByEmployee, perEmpDateTask, ot
     const tr = document.createElement('tr');
     tr.innerHTML = `<td><strong>${e}</strong></td><td class="num">${pts}</td><td class="num">${pct}%</td>`;
     tbody.appendChild(tr);
+  });
+
+  // fixed daily task checklist
+  document.getElementById('taskListDateNote').textContent = formatDateLabel(selectedDate,{month:'short',day:'numeric',year:'numeric'});
+  const [ty,tm,td] = selectedDate.split('-').map(Number);
+  const isMonday = new Date(ty,tm-1,td).getDay() === 1;
+  const taskListCard = document.getElementById('taskListCard');
+  taskListCard.innerHTML = '';
+  FIXED_TASKS.filter(t => !t.mondayOnly || isMonday).forEach(t=>{
+    const assignees = findTaskAssignees(selectedDate, t.name, t.category);
+    const row = document.createElement('div');
+    row.className = 'roster-row';
+    if(assignees.length){
+      const badgesHtml = assignees.map(e=>{
+        const idx = employees.indexOf(e) % ROSTER_TINTS.length;
+        return `<span class="roster-badge" style="background:${ROSTER_TINTS[idx]}; color:${ROSTER_TEXT[idx]};">${e}</span>`;
+      }).join('');
+      row.innerHTML = `
+        <span class="roster-task">${t.name}</span>
+        <div class="roster-right"><i class="ti ti-check" style="color:#173404; font-size:14px;" aria-hidden="true"></i>${badgesHtml}</div>`;
+    } else {
+      row.innerHTML = `
+        <span class="roster-task" style="color:var(--ink-soft);">${t.name}</span>
+        <span class="roster-badge roster-pending">Not completed yet</span>`;
+    }
+    taskListCard.appendChild(row);
   });
 }
 
